@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Mô hình mô phỏng số về tỉ lệ S/V của tế bào – STEM Sinh học 10, Bài 7 Tế bào nhân sơ">
+<meta name="theme-color" content="#FBF5E9">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0} img{max-width:100%} [hidden]{display:none!important}</style>
+<title>Mô hình mô phỏng số S/V của tế bào</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,600;1,700;1,800&display=swap">
+<style>
+/* Layout: game một màn hình mỗi lúc, thanh tiến trình trên cùng, trợ lý Linh Sinh dẫn lời ở mỗi màn.
+   Giao diện chỉ một tông sáng (kem) theo bộ nhận diện Linh Dạy Sinh. */
+:root {
+  --bg: #FBF5E9;
+  --panel: #F3E3D1;
+  --card: #FFFDF8;
+  --ink: #3B2A22;
+  --muted: #7A6455;
+  --red: #C0392B;
+  --green: #2F6B45;
+  --mint: #DDEBDD;
+  --o2: #2E7FB8;
+  --amber: #E0A030;
+  --line: #E2CDB6;
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-body: "Montserrat", "Segoe UI", Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--ink); }
+body {
+  font-family: var(--font-body); font-size: 16px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 14px 40px;
+}
+.app { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+button { font-family: var(--font-body); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.top { display: flex; gap: 8px; align-items: center; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 6px; }
+.sounds { display: flex; gap: 6px; flex: none; }
+.sounds button { border: 2px solid var(--line); background: var(--card); border-radius: 999px; width: 40px; height: 40px; font-size: 16px; }
+.sounds button[aria-pressed="false"] { opacity: .4; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--o2); outline-offset: 2px; }
+
+/* Thanh tiến trình */
+.progress { display: flex; gap: 6px; align-items: center; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.progress::-webkit-scrollbar { display: none; }
+.progress button { flex: none; border: 0; background: var(--panel); color: var(--muted); font: 700 12px var(--font-body); padding: 0 12px; min-height: 36px; border-radius: 999px; white-space: nowrap; }
+.progress button[aria-current="step"] { background: var(--green); color: #fff; }
+.progress button.done { background: var(--mint); color: var(--green); }
+
+/* Màn */
+.screen { background: var(--panel); border-radius: 24px; padding: clamp(18px, 4vw, 30px); display: flex; flex-direction: column; gap: 18px; animation: pop .35s ease; }
+@keyframes pop { from { transform: translateY(8px); opacity: .6 } to { transform: none; opacity: 1 } }
+.tag { font: 800 12px var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--red); }
+h1, h2 { font-family: var(--font-display); font-style: italic; font-weight: 800; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(30px, 7vw, 50px); line-height: 1.1; }
+h2 { font-size: clamp(22px, 4.6vw, 30px); line-height: 1.2; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.btn { border: 0; border-radius: 999px; padding: 13px 24px; font: 800 15px var(--font-body); background: var(--red); color: #fff; box-shadow: 0 4px 0 #8E2A20; transition: transform .1s; }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #8E2A20; }
+.btn.ghost { background: var(--card); color: var(--ink); box-shadow: 0 4px 0 var(--line); }
+.btn.green { background: var(--green); box-shadow: 0 4px 0 #1E4A2F; }
+.nav { justify-content: space-between; flex-wrap: nowrap; }
+
+/* Trợ lý Linh Sinh */
+.coach { display: flex; gap: 12px; align-items: flex-end; }
+.coach svg { width: 72px; height: 72px; flex: none; }
+.bubble { background: var(--card); border-radius: 18px 18px 18px 4px; padding: 12px 16px; font-weight: 600; min-width: 0; box-shadow: 0 2px 0 var(--line); }
+.bubble b { color: var(--green); }
+
+/* Màn mở đầu */
+.intro { min-height: 420px; justify-content: center; align-items: center; text-align: center; background: var(--green); color: #fff; }
+.intro h1 { color: #FBF5E9; max-width: 15ch; }
+.intro p { margin: 0; color: #F3E3D1; font-weight: 600; }
+.intro .hero { width: 150px; height: 150px; }
+
+/* Phần 1 */
+.choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.choice { background: var(--card); border: 3px solid transparent; border-radius: 20px; padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 6px; font: 700 15px var(--font-body); color: var(--ink); }
+.choice svg { width: 100%; max-width: 220px; height: 110px; }
+.choice.right { border-color: var(--green); background: var(--mint); }
+.choice.wrong { border-color: var(--red); }
+.formula { background: var(--card); border-radius: 18px; padding: 16px; display: grid; gap: 12px; }
+.formula .f { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: clamp(22px, 5vw, 30px); }
+.bars { display: grid; gap: 10px; }
+.bar { display: grid; grid-template-columns: 84px minmax(60px, 1fr) 84px; gap: 10px; align-items: center; font-weight: 700; font-size: 14px; }
+.bar .track { background: var(--panel); border-radius: 999px; height: 22px; overflow: hidden; }
+.bar .fill { height: 100%; border-radius: 999px; width: 0; transition: width 1s ease; }
+.bar .val { font-variant-numeric: tabular-nums; text-align: right; }
+
+/* Phòng thí nghiệm */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 2px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 8px 14px; font: 700 13px var(--font-body); }
+.chip[aria-pressed="true"] { background: var(--green); border-color: var(--green); color: #fff; }
+.lab { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 700px) { .lab { grid-template-columns: 1fr; } }
+.stage { position: relative; background: radial-gradient(circle at 50% 45%, #FFFFFF 0%, #F6EEE2 70%); border-radius: 20px; aspect-ratio: 1; max-width: 100%; overflow: hidden; }
+.stage svg { width: 100%; height: 100%; display: block; }
+.stage .cap { position: absolute; left: 12px; top: 12px; font-size: 12px; color: var(--muted); font-weight: 700; }
+.stage .runb { position: absolute; left: 0; right: 0; bottom: 14px; margin: 0 auto; width: max-content; }
+.stage .clock { position: absolute; top: 10px; right: 12px; background: var(--o2); color: #fff; font: 800 13px var(--font-body); padding: 5px 10px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.spec { background: var(--card); border-radius: 16px; padding: 12px 14px; font-size: 14px; }
+.spec b { display: block; font-size: 16px; }
+.slider label { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 14px; flex-wrap: wrap; }
+.slider label b { color: var(--red); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--red); height: 30px; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.stat { background: var(--card); border-radius: 14px; padding: 10px 12px; min-width: 0; }
+.stat .k { font-size: 12px; color: var(--muted); font-weight: 700; }
+.stat .v { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat.hl { background: var(--green); color: #fff; }
+.stat.hl .k { color: #DDEBDD; }
+.stat.o2 { background: var(--o2); color: #fff; grid-column: 1 / -1; }
+.stat.o2 .k { color: #DCEBF6; }
+.verdict { border-radius: 16px; padding: 14px 16px; font-weight: 700; background: var(--card); border: 2px solid var(--line); }
+.verdict.ok { border-color: var(--green); }
+.verdict.warn { border-color: var(--amber); }
+.verdict.bad { border-color: var(--red); }
+.verdict .head { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.verdict.ok .head { color: var(--green); } .verdict.warn .head { color: #A06C10; } .verdict.bad .head { color: var(--red); }
+.note { font-size: 12px; color: var(--muted); margin: 0; }
+
+/* Đồ thị */
+.chart { background: var(--card); border-radius: 20px; padding: 8px; overflow-x: auto; }
+.chart svg { width: 100%; height: auto; display: block; touch-action: none; cursor: crosshair; }
+.chart text { font-family: var(--font-body); }
+.readout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 520px) { .readout { grid-template-columns: 1fr 1fr; } .readout .o2 { grid-column: 1 / -1 !important; } }
+
+/* Kiểm định */
+.quiz { background: var(--card); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.quiz .claim { font-size: 18px; font-weight: 700; }
+.quiz .claim::before { content: "Mô hình ghi: "; color: var(--muted); font-weight: 600; }
+.quiz .ans { border-radius: 14px; padding: 12px 14px; background: var(--panel); font-weight: 600; }
+.quiz .ans strong.ok { color: var(--green); } .quiz .ans strong.no { color: var(--red); }
+.dots { display: flex; gap: 6px; }
+.dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); display: block; }
+.dots i.ok { background: var(--green); } .dots i.no { background: var(--red); }
+
+/* Tổng kết */
+.sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.sum div { background: var(--card); border-radius: 18px; padding: 16px; }
+.sum b { display: block; font-family: var(--font-display); font-style: italic; font-size: 26px; color: var(--green); }
+.sum span { font-size: 14px; color: var(--muted); font-weight: 600; }
+.take { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-weight: 600; }
+
+.end { background: var(--green); color: #fff; text-align: center; align-items: center; min-height: 380px; justify-content: center; }
+.end h2 { color: #FBF5E9; font-size: clamp(26px, 6vw, 40px); }
+.end p { margin: 0; color: #F3E3D1; font-weight: 600; font-size: 18px; }
+@media (max-width: 440px) {
+  body { padding-block: 6px 32px; }
+  .screen { padding: 16px; border-radius: 20px; gap: 14px; }
+  .btn { font-size: 14px; padding: 12px 18px; }
+  .coach svg { width: 54px; height: 54px; }
+  .bubble { padding: 10px 13px; font-size: 15px; }
+  .bar { grid-template-columns: 58px minmax(50px, 1fr) 70px; font-size: 12px; gap: 8px; }
+  .stat .v { font-size: 16px; }
+  .stage { width: 100%; max-width: 320px; margin: 0 auto; }
+  .choice { padding: 10px; font-size: 13px; }
+  .intro { min-height: 360px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+
+<div class="app">
+  <div class="top"><nav class="progress" id="progress" aria-label="Các phần"></nav><div class="sounds"><button type="button" class="snd" id="tMusic" aria-pressed="true" aria-label="Bật/tắt nhạc">🎵</button><button type="button" class="snd" id="tSfx" aria-pressed="true" aria-label="Bật/tắt hiệu ứng">🔊</button></div></div>
+  <main id="main"></main>
+</div>
+
+<script>
+(() => {
+  const D = 2e-9, PI = Math.PI;
+  const $ = s => document.querySelector(s);
+  const fmt = (x, d = 3) => x.toLocaleString("vi-VN", { maximumSignificantDigits: d });
+  const unit = r => r < 1e-3 ? { u: "µm", f: 1e6 } : r < 1e-2 ? { u: "mm", f: 1e3 } : { u: "cm", f: 1e2 };
+  const tOf = r => r * r / (6 * D);
+  function fmtTime(t) {
+    if (t < 1) return fmt(t * 1000) + " mili giây";
+    if (t < 60) return fmt(t) + " giây";
+    if (t < 3600) return fmt(t / 60) + " phút";
+    if (t < 86400) return fmt(t / 3600) + " giờ";
+    return fmt(t / 86400) + " ngày";
+  }
+  const lenStr = r => { const { u, f } = unit(r); return fmt(r * f) + " " + u; };
+
+
+  /* ---------- Âm thanh: tự tổng hợp bằng Web Audio, không dùng file nhạc ngoài ---------- */
+  const Sound = (() => {
+    let ctx = null, master = null, mus = null, timer = null, nextT = 0, i = 0, lastTick = 0;
+    const S = { musicOn: true, sfxOn: true };
+    S.init = () => {
+      if (ctx) { if (ctx.state === "suspended") ctx.resume(); return; }
+      try { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; ctx = new AC();
+        master = ctx.createGain(); master.gain.value = .7; master.connect(ctx.destination);
+        mus = ctx.createGain(); mus.gain.value = .09; mus.connect(master); } catch (e) { ctx = null; }
+    };
+    function tone(f, dur, type = "sine", vol = .25, when = 0, slide = 0, out = null) {
+      if (!ctx) return;
+      const t = ctx.currentTime + when, o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+      g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .012); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      o.connect(g); g.connect(out || master); o.start(t); o.stop(t + dur + .05);
+    }
+    function noise(dur, from, to, vol = .2) {
+      if (!ctx) return;
+      const len = Math.floor(ctx.sampleRate * dur), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+      for (let k = 0; k < len; k++) d[k] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), t = ctx.currentTime;
+      src.buffer = buf; f.type = "bandpass"; f.Q.value = 1.2; f.frequency.setValueAtTime(from, t); f.frequency.exponentialRampToValueAtTime(to, t + dur);
+      g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur * .3); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      src.connect(f); f.connect(g); g.connect(master); src.start(t);
+    }
+    const on = () => ctx && S.sfxOn;
+    S.click = () => on() && tone(1046, .07, "square", .06);
+    S.whoosh = () => on() && noise(.35, 400, 3000, .25);
+    S.correct = () => on() && [523, 659, 784, 1047].forEach((f, k) => tone(f, .18, "triangle", .22, k * .08));
+    S.wrong = () => on() && (tone(260, .28, "sawtooth", .09, 0, 120), tone(200, .3, "square", .05, .05, 90));
+    S.tick = () => { if (!on()) return; const n = performance.now(); if (n - lastTick < 55) return; lastTick = n; tone(1500, .03, "sine", .05); };
+    S.pop = () => on() && tone(500, .12, "sine", .2, 0, 1100);
+    S.bubbles = ms => { if (!on()) return; const c = Math.min(28, Math.round(ms / 140)); for (let k = 0; k < c; k++) tone(500 + Math.random() * 700, .09, "sine", .1, k * ms / 1000 / c, 1400 + Math.random() * 600); };
+    S.fanfare = () => on() && ([523, 659, 784].forEach((f, k) => tone(f, .16, "triangle", .2, k * .1)), [523, 659, 784, 1047].forEach(f => tone(f, .7, "triangle", .12, .32)));
+    // Nhạc nền: giai điệu ngũ cung vui tươi, lặp lại
+    const MEL = [523, 659, 784, 659, 880, 784, 659, 587, 523, 587, 659, 784, 659, 587, 523, 392];
+    const BASS = [131, 131, 196, 196, 175, 175, 196, 196];
+    function schedule() {
+      while (nextT < ctx.currentTime + .4) {
+        if (i % 2 === 0) tone(MEL[(i / 2) % 16 | 0], .22, "triangle", .5, nextT - ctx.currentTime, 0, mus);
+        if (i % 4 === 0) tone(BASS[(i / 4) % 8 | 0], .45, "sine", .7, nextT - ctx.currentTime, 0, mus);
+        if (i % 2 === 1) tone(2600, .03, "square", .08, nextT - ctx.currentTime, 0, mus);
+        nextT += .14; i++;
+      }
+    }
+    S.startMusic = () => { if (!ctx || !S.musicOn || timer) return; nextT = ctx.currentTime + .1; timer = setInterval(schedule, 100); };
+    S.stopMusic = () => { clearInterval(timer); timer = null; };
+    S.toggleMusic = () => { S.musicOn = !S.musicOn; S.musicOn ? S.startMusic() : S.stopMusic(); };
+    document.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b || b.classList.contains("snd")) return;
+      S.init();
+      if (b.id === "next" || b.id === "back" || b.dataset.k !== undefined || b.id === "nq") S.whoosh();
+      else if (!b.dataset.a && !b.classList.contains("choice") && b.id !== "run") S.click();
+      if (S.musicOn && !timer && b.id !== "start") S.startMusic();
+    }, true);
+    return S;
+  })();
+
+  /* ---------- Trợ lý Linh Sinh (nhân vật tự vẽ) ---------- */
+  const mascot = (wave = false) => `
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <defs><radialGradient id="mg${wave ? 1 : 0}" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#E9F5E6"/><stop offset="1" stop-color="#8CC69A"/></radialGradient></defs>
+      <path d="M50 8 C74 8 92 26 90 52 C88 78 70 94 48 92 C24 90 8 72 10 48 C12 24 28 8 50 8Z" fill="url(#mg${wave ? 1 : 0})" stroke="#2F6B45" stroke-width="3"/>
+      <circle cx="66" cy="70" r="9" fill="#B07CC6" opacity=".55"/>
+      <rect x="24" y="30" width="52" height="16" rx="8" fill="#FFFFFF" stroke="#2F6B45" stroke-width="2.5"/>
+      <circle cx="38" cy="38" r="5" fill="#3B2A22"/><circle cx="62" cy="38" r="5" fill="#3B2A22"/>
+      <circle cx="39.5" cy="36.5" r="1.6" fill="#fff"/><circle cx="63.5" cy="36.5" r="1.6" fill="#fff"/>
+      <path d="M40 56 Q50 65 60 56" fill="none" stroke="#3B2A22" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="28" cy="54" r="5" fill="#F2A7A0" opacity=".8"/><circle cx="72" cy="54" r="5" fill="#F2A7A0" opacity=".8"/>
+      ${wave ? '<path d="M88 40 q8 -10 4 -22" fill="none" stroke="#2F6B45" stroke-width="5" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" values="0 88 40;18 88 40;0 88 40" dur="0.8s" repeatCount="indefinite"/></path>' : ''}
+    </svg>`;
+  const coach = html => `<div class="coach">${mascot()}<div class="bubble">${html}</div></div>`;
+
+  /* ---------- Hình minh họa tế bào ---------- */
+  const DEFS = `<defs>
+    <linearGradient id="ecG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#CFEDE6"/><stop offset="1" stop-color="#8FCBBE"/></linearGradient>
+    <radialGradient id="huG" cx="45%" cy="40%" r="65%"><stop offset="0" stop-color="#FFF1EC"/><stop offset="1" stop-color="#F4C3B8"/></radialGradient>
+    <radialGradient id="nuG" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#C9A6DD"/><stop offset="1" stop-color="#7E4F9E"/></radialGradient>
+    <linearGradient id="egG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A2A22"/><stop offset=".48" stop-color="#5A4030"/><stop offset=".56" stop-color="#E8D9B5"/><stop offset="1" stop-color="#F6ECD2"/></linearGradient>
+    <radialGradient id="jelly" cx="50%" cy="50%" r="50%"><stop offset=".78" stop-color="#D6ECF7" stop-opacity=".2"/><stop offset="1" stop-color="#9CCBE6" stop-opacity=".55"/></radialGradient>
+    <radialGradient id="giG" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#6E6460"/><stop offset=".55" stop-color="#B7A9A2"/><stop offset=".8" stop-color="#F2C9BE"/><stop offset="1" stop-color="#F4C3B8"/></radialGradient>
+    <clipPath id="clipC"><circle cx="150" cy="150" r="0" id="clipCirc"/></clipPath>
+  </defs>`;
+
+  function ecoli(s) { // s = nửa chiều cao
+    const w = s * 2.2, h = s, x = 150 - w, y = 150 - h, W = 2 * w, H = 2 * h;
+    let g = "";
+    for (let i = 0; i < 3; i++) {
+      const yy = 150 + (i - 1) * h * 0.5;
+      g += `<path d="M${150 + w - 4} ${yy} q ${s * .5} ${-s * .4} ${s} 0 t ${s} 0 t ${s} 0" fill="none" stroke="#2E7F72" stroke-width="${Math.max(1.5, s * .05)}" stroke-linecap="round"/>`;
+    }
+    for (let i = 0; i < 14; i++) {
+      const a = i / 14 * 2 * PI, px = 150 + Math.cos(a) * (w - h * .2), py = 150 + Math.sin(a) * h * .98;
+      g += `<line x1="${px}" y1="${py}" x2="${px + Math.cos(a) * s * .22}" y2="${py + Math.sin(a) * s * .22}" stroke="#2E7F72" stroke-width="${Math.max(1, s * .025)}" stroke-linecap="round"/>`;
+    }
+    g += `<rect x="${x}" y="${y}" width="${W}" height="${H}" rx="${h}" fill="url(#ecG)" stroke="#2E7F72" stroke-width="${Math.max(2, s * .09)}"/>`;
+    g += `<rect x="${x + s * .12}" y="${y + s * .12}" width="${W - s * .24}" height="${H - s * .24}" rx="${h - s * .12}" fill="none" stroke="#5AA99A" stroke-width="${Math.max(1, s * .03)}" stroke-dasharray="${s * .12} ${s * .06}"/>`;
+    g += `<path d="M${150 - w * .45} 150 c ${s * .2} ${-s * .5} ${s * .4} ${s * .5} ${s * .6} 0 s ${s * .4} ${s * .5} ${s * .6} 0 s ${s * .4} ${-s * .5} ${s * .6} 0" fill="none" stroke="#7E4F9E" stroke-width="${Math.max(1.5, s * .07)}" stroke-linecap="round"/>`;
+    for (let i = 0; i < 26; i++) {
+      const px = 150 + Math.sin(i * 12.9898) * (w - h * .6), py = 150 + Math.sin(i * 78.233 + 1) * h * .6;
+      g += `<circle cx="${px}" cy="${py}" r="${Math.max(1, s * .035)}" fill="#3B6E66" opacity=".7"/>`;
+    }
+    g += `<circle cx="${150 + w * .5}" cy="${150 + h * .35}" r="${s * .14}" fill="none" stroke="#C0392B" stroke-width="${Math.max(1, s * .03)}"/>`;
+    return g;
+  }
+  function human(R) {
+    let p = "";
+    for (let i = 0; i <= 24; i++) { const a = i / 24 * 2 * PI, rr = R * (1 + .05 * Math.sin(a * 3) + .03 * Math.cos(a * 5)); p += (i ? "L" : "M") + (150 + Math.cos(a) * rr).toFixed(1) + " " + (150 + Math.sin(a) * rr).toFixed(1); }
+    let g = `<path d="${p}Z" fill="url(#huG)" stroke="#C0392B" stroke-width="${Math.max(2, R * .035)}" stroke-linejoin="round"/>`;
+    for (let k = 0; k < 3; k++) g += `<path d="M${150 - R * .5} ${150 - R * (.42 - k * .07)} q ${R * .35} ${-R * .14} ${R * .7} 0" fill="none" stroke="#D98F8F" stroke-width="${Math.max(1, R * .02)}"/>`;
+    [[.48, .28, 20], [-.52, .35, -30], [.2, .58, 70], [-.15, -.6, 10], [.55, -.35, -50]].forEach(([dx, dy, rot]) => {
+      const cx = 150 + dx * R, cy = 150 + dy * R;
+      g += `<g transform="rotate(${rot} ${cx} ${cy})"><ellipse cx="${cx}" cy="${cy}" rx="${R * .16}" ry="${R * .08}" fill="#F0A35E" stroke="#B9652A" stroke-width="${Math.max(1, R * .015)}"/><path d="M${cx - R * .1} ${cy} l ${R * .04} ${-R * .04} l ${R * .04} ${R * .06} l ${R * .04} ${-R * .06} l ${R * .04} ${R * .04}" fill="none" stroke="#B9652A" stroke-width="${Math.max(.8, R * .01)}"/></g>`;
+    });
+    for (let i = 0; i < 9; i++) { const a = i * 0.7 + 1, rr = R * (.62 + (i % 3) * .08); g += `<circle cx="${150 + Math.cos(a) * rr}" cy="${150 + Math.sin(a) * rr}" r="${Math.max(1.5, R * .035)}" fill="#E7B7C7" stroke="#C88" stroke-width=".6"/>`; }
+    g += `<circle cx="${150 - R * .05}" cy="${150 + R * .02}" r="${R * .3}" fill="url(#nuG)" stroke="#5B356F" stroke-width="${Math.max(1.5, R * .025)}"/>`;
+    g += `<circle cx="${150 + R * .04}" cy="${150 - R * .04}" r="${R * .1}" fill="#4A2A5E"/>`;
+    return g;
+  }
+  function egg(R) {
+    return `<circle cx="150" cy="150" r="${R * 1.22}" fill="url(#jelly)"/>
+      <circle cx="150" cy="150" r="${R}" fill="url(#egG)" stroke="#3B2A22" stroke-width="${Math.max(1.5, R * .02)}"/>
+      <ellipse cx="${150 - R * .35}" cy="${150 - R * .45}" rx="${R * .22}" ry="${R * .12}" fill="#fff" opacity=".35"/>`;
+  }
+  function giant(R) {
+    let g = `<circle cx="150" cy="150" r="${R}" fill="url(#giG)" stroke="#C0392B" stroke-width="${Math.max(2, R * .03)}"/>`;
+    g += `<circle cx="150" cy="150" r="${R * .16}" fill="url(#nuG)" opacity=".5"/>`;
+    g += `<text x="150" y="${150 + R * .34}" text-anchor="middle" font-size="${Math.max(10, R * .1)}" font-weight="700" fill="#fff" font-family="Montserrat, Arial">vùng thiếu O₂</text>`;
+    return g;
+  }
+  const SPECIES = [
+    { id: "ecoli", name: "Vi khuẩn E. coli", r: 0.5e-6, info: "Nhân sơ · dài khoảng 2 µm" },
+    { id: "human", name: "Tế bào người", r: 10e-6, info: "Nhân thực · khoảng 20 µm" },
+    { id: "egg", name: "Trứng ếch", r: 0.5e-3, info: "Một tế bào khổng lồ · khoảng 1 mm" },
+    { id: "ball", name: "Tế bào to bằng quả bóng", r: 0.11, info: "Tưởng tượng · 22 cm" },
+  ];
+  const kindOf = r => r < 3e-6 ? "ecoli" : r < 150e-6 ? "human" : r < 8e-3 ? "egg" : "ball";
+  const lg = Math.log10;
+  const sizePx = r => 28 + (lg(r) - (-6.4)) / 5.45 * 82; // bán kính hiển thị
+
+  function drawCell(svg, r, o2p = null) {
+    if (!svg) return "human";
+    const k = kindOf(r), R = sizePx(r);
+    let body = k === "ecoli" ? ecoli(R * .55) : k === "human" ? human(R) : k === "egg" ? egg(R * .85) : giant(R);
+    const Rr = k === "ecoli" ? R * .55 : k === "egg" ? R * .85 : R;
+    let o2 = "";
+    if (o2p !== null) {
+      const reach = Rr * (1 - o2p);
+      o2 = `<circle cx="150" cy="150" r="${(Rr + reach) / 2}" fill="none" stroke="#2E7FB8" stroke-opacity=".28" stroke-width="${Math.max(0, Rr - reach)}"/>`;
+      for (let i = 0; i < 22; i++) {
+        const a = i / 22 * 2 * PI + i, rr = Rr + 14 - (Rr + 14 - reach) * Math.min(1, o2p * (0.8 + (i % 5) * .08));
+        o2 += `<circle cx="${150 + Math.cos(a) * rr}" cy="${150 + Math.sin(a) * rr}" r="3.2" fill="#2E7FB8"/>`;
+      }
+    }
+    svg.innerHTML = DEFS + body + o2;
+    return k;
+  }
+
+  /* ---------- Trạng thái và điều hướng ---------- */
+  const STEPS = ["▶", "1 Thử thách", "2 Thí nghiệm", "3 Đồ thị", "4 Cắt bóng", "5 Kiểm định", "6 Chốt lại", "🏁"];
+  let step = 0, maxStep = 0;
+  const render = [];
+  function go(i) {
+    step = Math.max(0, Math.min(STEPS.length - 1, i)); maxStep = Math.max(maxStep, step);
+    $("#progress").innerHTML = STEPS.map((s, k) => `<button type="button" data-k="${k}" ${k === step ? 'aria-current="step"' : ''} class="${k < step ? 'done' : ''}" ${k > maxStep ? 'disabled' : ''}>${s}</button>`).join("");
+    $("#progress").querySelectorAll("button[data-k]").forEach(b => b.onclick = () => go(+b.dataset.k));
+    const cur = $("#progress [aria-current]"); if (cur) { const pr = $("#progress"); pr.scrollLeft = cur.offsetLeft - pr.clientWidth / 2 + cur.clientWidth / 2; }
+    $("#main").innerHTML = ""; render[step](); window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  const nav = (back = true, nextLabel = "Tiếp tục") => `<div class="row nav">${back ? '<button class="btn ghost" type="button" id="back">← Quay lại</button>' : '<span></span>'}<button class="btn" type="button" id="next">${nextLabel} →</button></div>`;
+  function bindNav() { const b = $("#back"), n = $("#next"); if (b) b.onclick = () => go(step - 1); if (n) n.onclick = () => go(step + 1); }
+  const screen = (cls, html) => { const s = document.createElement("section"); s.className = "screen " + cls; s.innerHTML = html; $("#main").appendChild(s); return s; };
+
+  /* 0. Mở đầu */
+  render[0] = () => {
+    screen("intro", `<div class="hero">${mascot(true)}</div>
+      <div class="tag" style="color:#F3E3D1">Sinh học 10 · Bài 7 · Tế bào nhân sơ</div>
+      <h1>Vì sao tế bào không to bằng quả bóng?</h1>
+      <p>Cùng <b>Linh Sinh</b> vượt 6 thử thách!</p>
+      <button class="btn" type="button" id="start" style="font-size:18px;padding:15px 34px">Bắt đầu ▶</button>`);
+    $("#start").onclick = () => { Sound.init(); Sound.startMusic(); go(1); };
+  };
+
+  /* 1. Thử thách A/B */
+  render[1] = () => {
+    const rod = (s, label) => `<svg viewBox="0 0 260 110"><g transform="translate(${100 - 150} ${55 - 150})">${DEFS}${ecoli(s)}</g></svg><span>${label}</span>`;
+    const sc = screen("", `<div class="tag">Phần 1 · Thử thách · SGK tr. 45</div>
+      ${coach("Con nào <b>sinh sản nhanh hơn</b>? 🤔")}
+      <div class="choices">
+        <button class="choice" type="button" data-c="A">${rod(5, "Vi khuẩn A · 1&nbsp;µm")}</button>
+        <button class="choice" type="button" data-c="B">${rod(25, "Vi khuẩn B · 5&nbsp;µm")}</button>
+      </div>
+      <div id="reveal" hidden></div>
+      ${nav()}`);
+    sc.querySelectorAll(".choice").forEach(b => b.onclick = () => {
+      sc.querySelectorAll(".choice").forEach(x => x.classList.remove("right", "wrong"));
+      const ok = b.dataset.c === "A"; b.classList.add(ok ? "right" : "wrong");
+      const rv = $("#reveal"); rv.hidden = false;
+      ok ? Sound.correct() : Sound.wrong();
+      rv.innerHTML = `${coach(ok ? "Chính xác! 🎉 Bí mật là <b>S/V</b>." : "Chưa đúng! Xem <b>S/V</b> nhé.")}
+        <div class="formula">
+          <div class="row" style="gap:18px"><span class="f" style="color:var(--green)">S = 4πr²</span><span class="f" style="color:var(--red)">V = 4/3·πr³</span><span class="f">S/V = 3/r = 6/d</span></div>
+          <div class="bars">
+            <div class="bar"><span>A · 1 µm</span><div class="track"><div class="fill" id="fa" style="background:var(--green)"></div></div><span class="val">6 µm⁻¹</span></div>
+            <div class="bar"><span>B · 5 µm</span><div class="track"><div class="fill" id="fb" style="background:var(--red)"></div></div><span class="val">1,2 µm⁻¹</span></div>
+          </div>
+          <div style="font-weight:800">A có S/V gấp <span style="color:var(--green)">5 lần</span> → <span style="color:var(--green)">sinh sản nhanh hơn</span></div>
+        </div>`;
+      requestAnimationFrame(() => { $("#fa").style.width = "100%"; $("#fb").style.width = "20%"; });
+    });
+    bindNav();
+  };
+
+  /* 2. Phòng thí nghiệm */
+  let labR = 10e-6;
+  render[2] = () => {
+    const sc = screen("", `<div class="tag">Phần 2 · Phòng thí nghiệm</div>
+      ${coach("Chọn tế bào, rồi bấm <b>Cho O₂ đi vào</b>!")}
+      <div class="chips" id="chips">${SPECIES.map(s => `<button class="chip" type="button" data-id="${s.id}">${s.name}</button>`).join("")}</div>
+      <div class="lab">
+        <div class="stage"><svg id="cell" viewBox="0 0 300 300" role="img" aria-label="Hình minh họa tế bào"></svg><span class="clock" id="clock" hidden></span><span class="cap" id="cap"></span><button class="btn green runb" type="button" id="run">Cho O₂ đi vào 💨</button></div>
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <div class="spec" id="spec"></div>
+          <div class="slider"><label for="r">Bán kính tế bào <b id="rOut"></b></label><input id="r" type="range" min="-6.4" max="-0.95" step="0.01"></div>
+          <div class="stats">
+            <div class="stat"><div class="k">Diện tích màng S</div><div class="v" id="sOut"></div></div>
+            <div class="stat"><div class="k">Thể tích V</div><div class="v" id="vOut"></div></div>
+            <div class="stat hl" style="grid-column:1/-1"><div class="k">Tỉ lệ S/V</div><div class="v" id="svOut" style="font-size:22px"></div></div>
+            <div class="stat o2"><div class="k">O₂ đi từ màng tới tâm mất</div><div class="v" id="tOut" style="font-size:22px"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="verdict" id="verdict"></div>
+      <p class="note">Giả định tế bào hình cầu · t ≈ r²/6D · hình không theo tỉ lệ</p>
+      ${nav()}`);
+    const r = $("#r"); let anim = null;
+    function update(exact) {
+      labR = exact || Math.pow(10, +r.value);
+      const { u, f } = unit(labR), rr = labR * f, t = tOf(labR);
+      $("#rOut").textContent = lenStr(labR);
+      $("#sOut").textContent = fmt(4 * PI * rr * rr) + " " + u + "²";
+      $("#vOut").textContent = fmt(4 / 3 * PI * rr ** 3) + " " + u + "³";
+      $("#svOut").textContent = fmt(3 / rr) + " " + u + "⁻¹";
+      $("#tOut").textContent = fmtTime(t);
+      const sp = SPECIES.find(s => Math.abs(lg(s.r) - lg(labR)) < 0.02);
+      sc.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", !!sp && c.dataset.id === sp.id));
+      const k = drawCell($("#cell"), labR);
+      const near = SPECIES.find(s => s.id === k);
+      $("#spec").innerHTML = sp ? `<b>${sp.name}</b>${sp.info}` : `<b>Tự chọn</b>${lenStr(labR)}`;
+      $("#cap").textContent = sp ? sp.name : "Kích thước tự chọn";
+      $("#clock").hidden = true;
+      if (anim) { cancelAnimationFrame(anim); anim = null; }
+      const v = $("#verdict");
+      if (t < 1) { v.className = "verdict ok"; v.innerHTML = `<div class="head">Kết luận</div>✅ O₂ tới tâm gần như ngay → tế bào sống khỏe.`; }
+      else if (t < 3600) { v.className = "verdict warn"; v.innerHTML = `<div class="head">Kết luận</div>⚠️ O₂ tới chậm → phần giữa thiếu O₂.`; }
+      else { v.className = "verdict bad"; v.innerHTML = `<div class="head">Kết luận</div>❌ O₂ mất ${fmtTime(t)} → tế bào chết trước! Muốn sống: tế bào phải <b>nhỏ</b> để S/V <b>đủ lớn</b>.`; }
+    }
+    $("#run").onclick = () => {
+      const t = tOf(labR), dur = 1200 + Math.min(1, Math.max(0, (lg(t) + 4) / 10)) * 5000, t0 = performance.now();
+      $("#clock").hidden = false; if (anim) cancelAnimationFrame(anim); Sound.bubbles(dur);
+      const stepA = now => {
+        if (!$("#cell")) { anim = null; return; }
+        const p = Math.min(1, (now - t0) / dur);
+        drawCell($("#cell"), labR, Math.sqrt(p));
+        $("#clock").textContent = "⏱ " + fmtTime(t * p);
+        if (p < 1) anim = requestAnimationFrame(stepA); else { anim = null; tOf(labR) < 3600 ? Sound.correct() : Sound.wrong(); }
+      };
+      anim = requestAnimationFrame(stepA);
+    };
+    sc.querySelectorAll(".chip").forEach(c => c.onclick = () => { const sp = SPECIES.find(s => s.id === c.dataset.id); r.value = lg(sp.r).toFixed(2); update(sp.r); });
+    r.oninput = () => { Sound.tick(); update(); };
+    r.value = lg(labR).toFixed(2); update(labR);
+    bindNav();
+  };
+
+  /* 3. Đồ thị tương tác */
+  let chartR = 10e-6;
+  render[3] = () => {
+    const sc = screen("", `<div class="tag">Phần 3 · Đồ thị S/V</div>
+      ${coach("<b>Chạm vào đồ thị</b> để đo! 👆")}
+      <div class="chips" id="cchips">${SPECIES.map(s => `<button class="chip" type="button" data-id="${s.id}">${s.name}</button>`).join("")}</div>
+      <div class="chart"><svg id="chart" viewBox="0 0 640 340" role="img" aria-label="Đồ thị tỉ lệ S/V theo bán kính tế bào"></svg></div>
+      <div class="readout">
+        <div class="stat"><div class="k">Bán kính</div><div class="v" id="cr"></div></div>
+        <div class="stat hl"><div class="k">S/V</div><div class="v" id="csv"></div></div>
+        <div class="stat o2" style="grid-column:auto"><div class="k">O₂ tới tâm</div><div class="v" id="ct"></div></div>
+      </div>
+      ${coach("To gấp 10 lần → S/V giảm 10 lần.")}
+      ${nav()}`);
+    let NAR = false, VW = 640, VH = 340, L = 70, Rr = 620, T = 20, B = 270, FS = 12;
+    const xmin = -7, xmax = -1, ymin = -5, ymax = 1;
+    function geo() {
+      NAR = $(".chart").clientWidth < 500;
+      if (NAR) { VW = 330; VH = 300; L = 54; Rr = 300; T = 14; B = 244; FS = 15; } else { VW = 640; VH = 340; L = 70; Rr = 620; T = 20; B = 270; FS = 12; }
+      $("#chart").setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+    }
+    const X = v => L + (v - xmin) / (xmax - xmin) * (Rr - L), Y = v => B - (v - ymin) / (ymax - ymin) * (B - T);
+    const sv = lr => lg(3 / (Math.pow(10, lr) * 1e6));
+    const r1 = lg(Math.sqrt(6 * D * 1)), r2 = lg(Math.sqrt(6 * D * 3600));
+    function draw() {
+      geo();
+      let g = `<defs><linearGradient id="lineG" x1="0" x2="1"><stop offset="0" stop-color="#2F6B45"/><stop offset=".55" stop-color="#E0A030"/><stop offset="1" stop-color="#C0392B"/></linearGradient></defs>`;
+      g += `<rect x="${L}" y="${T}" width="${X(r1) - L}" height="${B - T}" fill="#DDEBDD"/>`;
+      g += `<rect x="${X(r1)}" y="${T}" width="${X(r2) - X(r1)}" height="${B - T}" fill="#F8E7C2"/>`;
+      g += `<rect x="${X(r2)}" y="${T}" width="${Rr - X(r2)}" height="${B - T}" fill="#F6D3CC"/>`;
+      g += `<text x="${(L + X(r1)) / 2}" y="${B - 10}" text-anchor="middle" font-size="${FS - 1}" font-weight="800" fill="#2F6B45">${NAR ? "KHỎE" : "SỐNG KHỎE"}</text>`;
+      g += `<text x="${(X(r1) + X(r2)) / 2}" y="${B - 10}" text-anchor="middle" font-size="${FS - 1}" font-weight="800" fill="#A06C10">${NAR ? "THIẾU" : "THIẾU DẦN"}</text>`;
+      g += `<text x="${(X(r2) + Rr) / 2}" y="${T + 18}" text-anchor="middle" font-size="${FS - 1}" font-weight="800" fill="#C0392B">THIẾU O₂</text>`;
+      const xl = { "-7": "0,1 µm", "-6": "1 µm", "-5": "10 µm", "-4": "100 µm", "-3": "1 mm", "-2": "1 cm", "-1": "10 cm" };
+      for (let i = xmin; i <= xmax; i++) { g += `<line x1="${X(i)}" x2="${X(i)}" y1="${T}" y2="${B}" stroke="#fff" stroke-opacity=".8"/>` + (NAR && i % 2 === 0 ? "" : `<text x="${X(i)}" y="${B + 18}" text-anchor="middle" font-size="${FS}" font-weight="600" fill="#7A6455">${xl[i]}</text>`); }
+      for (let j = ymin; j <= ymax; j++) { g += `<line x1="${L}" x2="${Rr}" y1="${Y(j)}" y2="${Y(j)}" stroke="#fff" stroke-opacity=".8"/>` + (NAR && (j + 5) % 2 === 1 ? "" : `<text x="${L - 6}" y="${Y(j) + 4}" text-anchor="end" font-size="${FS}" font-weight="600" fill="#7A6455">10${j < 0 ? "⁻" : ""}${"⁰¹²³⁴⁵⁶"[Math.abs(j)]}</text>`); }
+      g += `<text x="${(L + Rr) / 2}" y="${B + 40}" text-anchor="middle" font-size="${FS + 1}" font-weight="700" fill="#3B2A22">Bán kính tế bào</text>`;
+      g += `<text x="12" y="${(T + B) / 2}" text-anchor="middle" font-size="${FS}" font-weight="700" fill="#3B2A22" transform="rotate(-90 12 ${(T + B) / 2})">S/V (µm⁻¹)</text>`;
+      g += `<line x1="${X(-6.52)}" y1="${Y(sv(-6.52))}" x2="${X(-1)}" y2="${Y(sv(-1))}" stroke="url(#lineG)" stroke-width="5" stroke-linecap="round"/>`;
+      const cols = { ecoli: "#2E7F72", human: "#C0392B", egg: "#5A4030", ball: "#7A6455" };
+      SPECIES.forEach(s => { const lr = Math.min(lg(s.r), xmax); g += `<circle cx="${X(lr)}" cy="${Y(sv(lr))}" r="6" fill="${cols[s.id]}" stroke="#fff" stroke-width="2"/><text x="${X(lr) + (s.id === "ball" ? -10 : 9)}" y="${Y(sv(lr)) - 10}" text-anchor="${s.id === "ball" ? "end" : "start"}" font-size="${FS}" font-weight="700" fill="#3B2A22">${({ ecoli: "E. coli", human: "Người", egg: "Trứng ếch", ball: "Quả bóng" })[s.id]}</text>`; });
+      const lr = Math.max(xmin, Math.min(xmax, lg(chartR)));
+      g += `<line x1="${X(lr)}" x2="${X(lr)}" y1="${T}" y2="${B}" stroke="#2E7FB8" stroke-width="2" stroke-dasharray="5 4"/>`;
+      g += `<circle cx="${X(lr)}" cy="${Y(sv(lr))}" r="10" fill="#2E7FB8" stroke="#fff" stroke-width="3"/>`;
+      g += `<rect x="${L}" y="${T}" width="${Rr - L}" height="${B - T}" fill="transparent" id="hit"/>`;
+      $("#chart").innerHTML = g;
+      $("#cr").textContent = lenStr(chartR);
+      const { u, f } = unit(chartR);
+      $("#csv").textContent = fmt(3 / (chartR * f)) + " " + u + "⁻¹";
+      $("#ct").textContent = fmtTime(tOf(chartR));
+      sc.querySelectorAll("#cchips .chip").forEach(c => c.setAttribute("aria-pressed", Math.abs(lg(SPECIES.find(s => s.id === c.dataset.id).r) - lg(chartR)) < .01));
+    }
+    const svg = $("#chart");
+    function pick(e) {
+      const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+      const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+      const v = xmin + (Math.max(L, Math.min(Rr, p.x)) - L) / (Rr - L) * (xmax - xmin);
+      chartR = Math.pow(10, Math.max(-6.52, v)); Sound.tick(); draw();
+    }
+    let down = false;
+    svg.addEventListener("pointerdown", e => { down = true; svg.setPointerCapture(e.pointerId); pick(e); });
+    svg.addEventListener("pointermove", e => { if (down) pick(e); });
+    svg.addEventListener("pointerup", () => down = false);
+    sc.querySelectorAll("#cchips .chip").forEach(c => c.onclick = () => { chartR = SPECIES.find(s => s.id === c.dataset.id).r; draw(); });
+    draw(); bindNav();
+    const ro = new ResizeObserver(() => { if ($("#chart")) draw(); }); ro.observe($(".chart"));
+  };
+
+  /* 4. Cắt quả bóng */
+  render[4] = () => {
+    const sc = screen("", `<div class="tag">Phần 4 · Cắt quả bóng</div>
+      ${coach("Cắt quả bóng thành <b>nhiều tế bào nhỏ</b> thì sao? ✂️")}
+      <div class="slider"><label for="k">Chia mỗi chiều thành <b id="kOut"></b></label><input id="k" type="range" min="1" max="10" step="1" value="1"></div>
+      <div class="lab">
+        <div class="stage"><svg id="grid" viewBox="0 0 300 300" role="img" aria-label="Các tế bào sau khi chia"></svg><span class="cap" style="background:#FFFDF8cc;border-radius:8px">Nhìn từ một mặt của khối</span></div>
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <div class="stats">
+            <div class="stat"><div class="k">Số tế bào</div><div class="v" id="nOut"></div></div>
+            <div class="stat"><div class="k">Bán kính mỗi tế bào</div><div class="v" id="r2"></div></div>
+            <div class="stat"><div class="k">Tổng thể tích</div><div class="v">Không đổi</div></div>
+            <div class="stat"><div class="k">Tổng diện tích màng</div><div class="v" id="sOut"></div></div>
+          </div>
+          <div class="formula" style="gap:10px">
+            <div style="font-weight:800">So sánh S/V</div>
+            <div class="bars">
+              <div class="bar"><span>Trước</span><div class="track"><div class="fill" style="background:var(--red);width:10%"></div></div><span class="val" id="sv0"></span></div>
+              <div class="bar"><span>Sau chia</span><div class="track"><div class="fill" id="svBar" style="background:var(--green)"></div></div><span class="val" id="sv1"></span></div>
+            </div>
+            <div class="stat o2"><div class="k">O₂ tới tâm mỗi tế bào</div><div class="v" id="tOut"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="verdict ok" id="concl"></div>
+      ${nav()}`);
+    const R0 = 0.11, sv0 = 3 / (R0 * 100);
+    function update() {
+      const k = +$("#k").value, n = k ** 3, rr = R0 / k;
+      $("#kOut").textContent = k + " phần";
+      $("#nOut").textContent = n.toLocaleString("vi-VN");
+      $("#r2").textContent = lenStr(rr);
+      $("#sOut").textContent = "× " + k;
+      $("#sv0").textContent = fmt(sv0) + " cm⁻¹";
+      $("#sv1").textContent = fmt(sv0 * k) + " cm⁻¹";
+      $("#svBar").style.width = Math.min(100, k * 10) + "%";
+      $("#tOut").textContent = fmtTime(tOf(rr)) + (k > 1 ? ` (nhanh hơn ${k * k} lần)` : "");
+      $("#concl").innerHTML = `<div class="head">Kết luận</div>` + (k === 1 ? "Một tế bào khổng lồ: S/V nhỏ, O₂ rất chậm." : `S/V tăng ${k} lần → O₂ nhanh hơn ${k * k} lần → cơ thể lớn cần <b>nhiều tế bào nhỏ</b>!`);
+      const cell = 280 / k; let g = "";
+      for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) g += `<circle cx="${10 + cell * (a + .5)}" cy="${10 + cell * (b + .5)}" r="${cell * .44}" fill="${k === 1 ? "url(#giG)" : "url(#huG)"}" stroke="#C0392B" stroke-width="${Math.max(1, 3.5 - k * .25)}"/>` + (k <= 5 ? `<circle cx="${10 + cell * (a + .5) - cell * .03}" cy="${10 + cell * (b + .5)}" r="${cell * .12}" fill="url(#nuG)"/>` : "");
+      $("#grid").innerHTML = DEFS + g;
+    }
+    $("#k").oninput = () => { Sound.pop(); update(); }; update(); bindNav();
+  };
+
+  /* 5. Kiểm định */
+  const CLAIMS = [
+    ["Tế bào càng lớn thì tỉ lệ S/V càng lớn.", false, "S/V = 3/r, nên r tăng thì S/V giảm."],
+    ["Khi bán kính tăng gấp đôi, thể tích tăng 8 lần nhưng diện tích màng chỉ tăng 4 lần.", true, "V tỉ lệ với r³ (2³ = 8), S tỉ lệ với r² (2² = 4)."],
+    ["Tế bào nhân sơ có kích thước lớn hơn tế bào nhân thực khoảng 10 lần.", false, "Ngược lại. SGK Bài 7: tế bào nhân sơ khoảng 1–5 µm, chỉ bằng khoảng 1/10 tế bào nhân thực."],
+    ["Tế bào nhân sơ nhỏ nên S/V lớn, trao đổi chất nhanh, sinh trưởng và sinh sản nhanh.", true, "Đúng như SGK Bài 7, trang 44."],
+    ["Lòng đỏ trứng là một tế bào rất lớn nên tỉ lệ S/V của nó rất lớn.", false, "Tế bào càng lớn, S/V càng nhỏ. Nó sống được vì phần lớn là chất dự trữ, ít trao đổi chất."],
+  ];
+  let qi = 0, res = [];
+  render[5] = () => {
+    if (qi >= CLAIMS.length) { qi = 0; res = []; }
+    const sc = screen("", `<div class="tag">Phần 5 · Kiểm định mô hình</div>
+      ${coach("AI có thể ghi sai! Em <b>kiểm định</b> nhé 🔍")}
+      <div class="dots" id="dots"></div>
+      <div class="quiz" id="quiz"></div>
+      ${nav()}`);
+    function show() {
+      $("#dots").innerHTML = CLAIMS.map((_, i) => `<i class="${res[i] === true ? "ok" : res[i] === false ? "no" : ""}"></i>`).join("");
+      if (qi >= CLAIMS.length) {
+        const sc2 = res.filter(Boolean).length; Sound.fanfare();
+        $("#quiz").innerHTML = `<div style="font-size:22px;font-weight:800">Em kiểm định đúng ${sc2}/${CLAIMS.length} câu!</div>${coach(sc2 === CLAIMS.length ? "Tuyệt vời! 🏆" : "Làm tốt lắm! Xem lại câu sai nhé.")}<button class="btn ghost" type="button" id="again" style="align-self:flex-start">Làm lại</button>`;
+        $("#again").onclick = () => { qi = 0; res = []; show(); };
+        return;
+      }
+      const [q, ok, why] = CLAIMS[qi];
+      $("#quiz").innerHTML = `<div class="claim">${q}</div><div class="row"><button class="btn green" type="button" data-a="1">Đúng</button><button class="btn" type="button" data-a="0">Sai</button></div><div class="ans" id="ans" hidden></div>`;
+      $("#quiz").querySelectorAll("[data-a]").forEach(b => b.onclick = () => {
+        const correct = (b.dataset.a === "1") === ok; res[qi] = correct; correct ? Sound.correct() : Sound.wrong();
+        $("#quiz").querySelectorAll("[data-a]").forEach(x => x.disabled = true);
+        const a = $("#ans"); a.hidden = false;
+        a.innerHTML = `<strong class="${correct ? "ok" : "no"}">${correct ? "Em bắt đúng rồi!" : "Chưa đúng."}</strong> Câu này ${ok ? "đúng" : "sai"}. ${why} <div style="margin-top:10px"><button class="btn ghost" type="button" id="nq">Câu tiếp →</button></div>`;
+        $("#nq").onclick = () => { qi++; show(); };
+        $("#dots").innerHTML = CLAIMS.map((_, i) => `<i class="${res[i] === true ? "ok" : res[i] === false ? "no" : ""}"></i>`).join("");
+      });
+    }
+    show(); bindNav();
+  };
+
+  /* 6. Chốt công thức */
+  render[6] = () => {
+    screen("", `<div class="tag">Phần 6 · Chốt lại</div>
+      ${coach("<b>Chốt lại</b> nào! 📌")}
+      <div class="sum">
+        <div><b>S = 4πr²</b><span>Diện tích màng: nguồn cung</span></div>
+        <div><b>V = 4/3·πr³</b><span>Thể tích: nhu cầu</span></div>
+        <div><b>S/V = 3/r</b><span>Tế bào càng to, S/V càng nhỏ</span></div>
+        <div><b>t ≈ r²/6D</b><span>Thời gian O₂ khuếch tán tới tâm</span></div>
+      </div>
+      <ul class="take">
+        <li>Nhân sơ nhỏ → S/V lớn → sinh sản nhanh → cơm nhanh thiu.</li>
+        <li>Tế bào to bằng quả bóng: S/V quá nhỏ → chết.</li>
+        <li>Cơ thể lớn = nhiều tế bào nhỏ.</li>
+      </ul>
+      ${nav(true, "Hoàn thành")}`);
+    bindNav();
+  };
+
+  /* 7. Kết thúc */
+  render[7] = () => {
+    screen("end", `<div style="width:140px;height:140px">${mascot(true)}</div>
+      <h2>Cảm ơn các em đã tham gia!</h2>
+      <p>Chị hẹn gặp lại các em ở bài sau nhé. Bye bye!</p>
+      <button class="btn" type="button" id="replay">Chơi lại ↺</button>`);
+    Sound.fanfare();
+    $("#replay").onclick = () => { qi = 0; res = []; maxStep = 0; go(0); };
+  };
+
+  $("#tMusic").onclick = e => { Sound.init(); Sound.toggleMusic(); e.currentTarget.setAttribute("aria-pressed", Sound.musicOn); };
+  $("#tSfx").onclick = e => { Sound.init(); Sound.sfxOn = !Sound.sfxOn; e.currentTarget.setAttribute("aria-pressed", Sound.sfxOn); };
+  go(0);
+})();
+</script>
+
+</body>
+</html>
